@@ -142,6 +142,41 @@ yarn.lock
 `
 
 const CONCURRENCY_LIMIT = 32
+const isInteractive = process.stderr.isTTY
+
+/**
+ * Creates a throttled progress writer that only starts showing output
+ * after a grace period, avoiding flicker for fast operations.
+ * @param {number} [graceMs=150] - Delay before progress starts rendering
+ * @param {number} [intervalMs=80] - Minimum time between updates
+ */
+function createProgress(graceMs = 150, intervalMs = 80) {
+  const start = performance.now()
+  let lastWrite = 0
+  let active = false
+
+  return {
+    /** @param {string} message */
+    update(message) {
+      if (!isInteractive) return
+      const now = performance.now()
+      if (!active) {
+        if (now - start < graceMs) return
+        active = true
+      }
+      if (now - lastWrite < intervalMs) return
+      lastWrite = now
+      process.stderr.clearLine(0)
+      process.stderr.cursorTo(0)
+      process.stderr.write(message)
+    },
+    clear() {
+      if (!isInteractive || !active) return
+      process.stderr.clearLine(0)
+      process.stderr.cursorTo(0)
+    },
+  }
+}
 
 /**
  * @param {string} absolutePath
@@ -182,12 +217,22 @@ async function createIgnoreMatcher(rootPath, extraExcludes = []) {
 }
 
 /**
+ * @typedef {{ update(message: string): void, clear(): void }} Progress
+ */
+
+/**
  * @param {string} dirPath
  * @param {(absolutePath: string) => boolean} shouldIgnore
- * @param {string[]} collected
- * @returns {Promise<string[]>}
+ * @param {string[]} [collected]
+ * @param {Progress} [progress]
+ * @returns {Promise<{ files: string[], progress: Progress }>}
  */
-async function collectFiles(dirPath, shouldIgnore, collected = []) {
+async function collectFiles(
+  dirPath,
+  shouldIgnore,
+  collected = [],
+  progress = createProgress()
+) {
   const entries = await readdir(dirPath, { withFileTypes: true })
 
   for (const entry of entries) {
@@ -197,14 +242,15 @@ async function collectFiles(dirPath, shouldIgnore, collected = []) {
 
     if (entry.isDirectory()) {
       if (shouldIgnore(absolutePath)) continue
-      await collectFiles(absolutePath, shouldIgnore, collected)
+      await collectFiles(absolutePath, shouldIgnore, collected, progress)
     } else if (entry.isFile()) {
       if (shouldIgnore(absolutePath)) continue
       collected.push(absolutePath)
+      progress.update(`  Scanning... ${collected.length} files found`)
     }
   }
 
-  return collected
+  return { files: collected, progress }
 }
 
 /**
@@ -244,12 +290,20 @@ function createZip(tempRoot, repoName, outputZipPath) {
 /**
  * @param {Array<() => Promise<void>>} tasks
  * @param {number} limit
+ * @param {(completed: number, total: number) => void} [onProgress]
  */
-async function runWithLimit(tasks, limit) {
+async function runWithLimit(tasks, limit, onProgress) {
   const executing = new Set()
+  let completed = 0
+  const total = tasks.length
 
   for (const task of tasks) {
-    const promise = task().finally(() => executing.delete(promise))
+    const promise = task()
+      .then(() => {
+        completed++
+        if (onProgress) onProgress(completed, total)
+      })
+      .finally(() => executing.delete(promise))
     executing.add(promise)
 
     if (executing.size >= limit) {
@@ -276,18 +330,20 @@ const outputZipPath = output
 let tempRoot
 
 try {
+  const startTime = performance.now()
   tempRoot = await mkdtemp(path.join(tmpdir(), `${repoName}-`))
   const stagedRepoPath = path.join(tempRoot, repoName)
 
-  console.log('Collecting files...')
-
   const shouldIgnore = await createIgnoreMatcher(sourceRoot, exclude)
-  const files = await collectFiles(sourceRoot, shouldIgnore)
-
-  console.log(
-    `Copying ${files.length} files (concurrency: ${CONCURRENCY_LIMIT})...`
+  const { files, progress: scanProgress } = await collectFiles(
+    sourceRoot,
+    shouldIgnore
   )
+  scanProgress.clear()
 
+  console.log(`Found ${files.length} files, copying...`)
+
+  const copyProgress = createProgress()
   const tasks = files.map((absoluteSource) => async () => {
     if (!absoluteSource.startsWith(sourceRootPrefix)) return
 
@@ -298,13 +354,16 @@ try {
     await copyFile(absoluteSource, absoluteDest)
   })
 
-  await runWithLimit(tasks, CONCURRENCY_LIMIT)
+  await runWithLimit(tasks, CONCURRENCY_LIMIT, (completed, total) => {
+    copyProgress.update(`  Copying... ${completed}/${total} files`)
+  })
+  copyProgress.clear()
 
-  console.log(`Creating zip archive: ${outputZipPath}`)
   createZip(tempRoot, repoName, outputZipPath)
 
   if (process.exitCode !== 1) {
-    console.log(`Archive created at ${outputZipPath}`)
+    const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
+    console.log(`Created ${outputZipPath} (${elapsed}s)`)
   }
 } finally {
   if (tempRoot) {

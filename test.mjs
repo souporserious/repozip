@@ -118,8 +118,8 @@ describe('repozip', () => {
   test('creates a zip from a target directory', async () => {
     await cleanZips(fixtureDir)
     const stdout = run([fixtureDir])
-    assert.match(stdout, /Collecting files/)
-    assert.match(stdout, /Archive created at/)
+    assert.match(stdout, /Found \d+ files/)
+    assert.match(stdout, /Created /)
 
     const zips = await findZips(fixtureDir)
     assert.equal(zips.length, 1)
@@ -132,7 +132,7 @@ describe('repozip', () => {
   test('creates a zip from cwd when no target given', async () => {
     await cleanZips(fixtureDir)
     const stdout = run([], { cwd: fixtureDir })
-    assert.match(stdout, /Archive created at/)
+    assert.match(stdout, /Created /)
 
     const zips = await findZips(fixtureDir)
     assert.equal(zips.length, 1)
@@ -147,7 +147,7 @@ describe('repozip', () => {
     // node_modules should not be counted in copied files
     // The fixture has: package.json, src/index.js, docs/guide.md, .env.example, .gitignore
     // Excluded: node_modules/**, .env, skip.ignoreme
-    assert.match(stdout, /Copying \d+ files/)
+    assert.match(stdout, /Found \d+ files/)
 
     const zips = await findZips(fixtureDir)
     assert.equal(zips.length, 1)
@@ -236,7 +236,7 @@ describe('repozip', () => {
     const customPath = path.join(fixtureDir, 'custom-output.zip')
     try {
       const stdout = run([fixtureDir, '--output', customPath])
-      assert.match(stdout, /Archive created at/)
+      assert.match(stdout, /Created /)
 
       const entries = await readdir(fixtureDir)
       assert.ok(entries.includes('custom-output.zip'))
