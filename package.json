@@ -1,0 +1,29 @@
+{
+  "name": "repozip",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zip a repository for sharing with LLM chatbots.",
+  "license": "MIT",
+  "bin": {
+    "repozip": "index.mjs"
+  },
+  "files": [
+    "index.mjs"
+  ],
+  "keywords": [
+    "repo",
+    "zip",
+    "llm",
+    "context",
+    "chatbot"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test.mjs"
+  },
+  "dependencies": {
+    "fast-ignore": "^1.1.3"
+  }
+}
