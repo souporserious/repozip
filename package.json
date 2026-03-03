@@ -4,6 +4,13 @@
   "type": "module",
   "description": "Zip a repository for sharing with LLM chatbots.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/souporserious/repozip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/souporserious/repozip/issues"
+  },
   "bin": {
     "repozip": "index.mjs"
   },
