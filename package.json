@@ -1,6 +1,6 @@
 {
   "name": "repozip",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Zip a repository for sharing with LLM chatbots.",
   "license": "MIT",
