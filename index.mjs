@@ -72,7 +72,7 @@ function parseArgs(argv) {
       continue
     }
 
-    if (arg.startsWith('--')) {
+    if (arg.startsWith('-')) {
       console.error(`Unknown option: ${arg}\n`)
       console.log(HELP_TEXT)
       process.exit(1)

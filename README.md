@@ -59,7 +59,7 @@ repozip ../my-project --exclude "docs,*.test.ts"
 Write to a specific output path:
 
 ```sh
-repozip ../my-project -o context.zip
+repozip ../my-project --output context.zip
 ```
 
 ## How It Works

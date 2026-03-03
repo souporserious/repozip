@@ -244,17 +244,4 @@ describe('repozip', () => {
       await rm(customPath, { force: true })
     }
   })
-
-  test('-o short flag works', async () => {
-    const customPath = path.join(fixtureDir, 'short-flag.zip')
-    try {
-      const stdout = run([fixtureDir, '-o', customPath])
-      assert.match(stdout, /Archive created at/)
-
-      const entries = await readdir(fixtureDir)
-      assert.ok(entries.includes('short-flag.zip'))
-    } finally {
-      await rm(customPath, { force: true })
-    }
-  })
 })
